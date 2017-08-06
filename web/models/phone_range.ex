@@ -1,3 +1,4 @@
+require IEx
 defmodule Did.PhoneRange do
   # use Did.Web, :model
   use Ecto.Schema
@@ -20,6 +21,7 @@ defmodule Did.PhoneRange do
     |> validate_phone(:start_phone)
     |> validate_phone(:end_phone)
     |> validate_start_before_end
+    |> validate_childs
     #|> validate_childs_start_before_end
   end
 
@@ -39,7 +41,6 @@ defmodule Did.PhoneRange do
         else
           changeset = add_error(changeset, :start_phone, "end_phone start before start_phone")
           changeset = add_error(changeset, :end_phone, "end_phone start before start_phone")
-          changeset
         end
       {:error, msg } -> 
         changeset = add_error(changeset, :start_phone, msg)
@@ -47,6 +48,64 @@ defmodule Did.PhoneRange do
         changeset
       _ -> changeset
     end
+  end
+
+  def validate_childs(changeset) do
+    validate_childs_within_range(changeset)
+    #changeset = validate_childs_no_overlap(changeset)
+  end
+
+  def validate_childs_within_range(changeset) do 
+    has_phone_errors(changeset) 
+    |> has_childs_within_range
+  end
+
+  def has_phone_errors(%{errors: errors} = changeset) when is_list(errors) do
+    if List.keyfind(errors, :start_phone, 0) != nil || 
+    List.keyfind(errors, :end_phone, 0) != nil do
+      {:error, changeset}
+    else
+      {:ok, changeset}
+    end
+  end
+  def has_phone_errors(changeset), do: {:ok, changeset}
+
+  def has_childs_within_range({:ok, changeset}) do
+    childs = get_change(changeset, :childs)
+    if childs != nil do
+      case get_range_start_end(changeset) do
+        {:ok, start, ends} ->
+          new_childs = childs 
+                       |> Enum.map(fn(child) -> Tuple.append(get_range_start_end(child), child) end) 
+                       |> Enum.map(&validate_child_within(&1, start, ends))
+                       |> Enum.into([])
+          put_assoc(changeset, :childs, new_childs)
+        _ ->
+          changeset
+      end
+    else
+      changeset
+    end
+  end
+
+  def has_childs_within_range({:error, changeset}) do
+    changeset
+  end
+
+  def validate_child_within({:ok, child_start, child_end, child}, start, ends) do
+    child = Enum.reduce([{:start_phone, child_start}, {:end_phone, child_end}], child, fn({field, phone}, child) -> 
+      unless phone_in_range(phone, start, ends) do
+        add_error(child, field, to_string(field) <> " is not within start and end phone of parent range")
+      else
+        child
+      end
+    end)
+    child
+  end
+  def validate_child_within({:error, _, child}, _, _), do: child 
+
+  def validate_childs_no_overlap(changeset) do 
+    changeset
   end
 
   def get_range_start_end(%PhoneRange{start_phone: start_phone, end_phone: end_phone}) do
@@ -75,5 +134,11 @@ defmodule Did.PhoneRange do
     else
       false
     end
+  end
+
+  def phone_in_range(phone, start, ends) do
+    if start.international_code <= phone.international_code && phone.international_code <= ends.international_code &&
+       start.area_code <= phone.area_code && phone.area_code <= ends.area_code &&
+       start.number <= phone.number && phone.number <= ends.number, do: true, else: false
   end
 end

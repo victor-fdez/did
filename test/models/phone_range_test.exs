@@ -1,8 +1,9 @@
+require IEx
 defmodule Did.PhoneRangeTest do
   use Did.ModelCase
   import Did.ModelCase.Macros
 
-  #alias Did.PhoneRange
+  alias Did.PhoneRange
 
   @phone_range_tests %{
     0 => %{
@@ -43,5 +44,43 @@ defmodule Did.PhoneRangeTest do
   phone_range_test @phone_range_tests[3]
   phone_range_test @phone_range_tests[4]
   phone_range_test @phone_range_tests[5]
+
+  test "check childs are added when formatted correctly" do
+    changeset = PhoneRange.changeset(%PhoneRange{}, %{
+      start_phone: "+19154710553", end_phone: "+19154710554",
+      childs: [
+        %{ start_phone: "+19154710553", end_phone: "+19154710553" },
+        %{ start_phone: "+19154710554", end_phone: "+19154710554" }
+      ] 
+    })
+    assert changeset.valid?
+  end
+  
+  test "check failure when child has start phone outside parent phone range" do
+    changeset = PhoneRange.changeset(%PhoneRange{}, %{
+      start_phone: "+19154710553", end_phone: "+19154710554",
+      childs: [
+        %{ start_phone: "+19154710552", end_phone: "+19154710553" },
+        %{ start_phone: "+19154710554", end_phone: "+19154710554" }
+      ] 
+    })
+    refute changeset.valid?
+    cs_child0 = Enum.at(get_change(changeset, :childs), 0)
+    assert List.keymember?(cs_child0.errors, :start_phone, 0) 
+  end
+
+  test "check failure when child has start and end phone outside parent phone range" do
+    changeset = PhoneRange.changeset(%PhoneRange{}, %{
+      start_phone: "+19154710553", end_phone: "+19154710554",
+      childs: [
+        %{ start_phone: "+19154710553", end_phone: "+19154710553" },
+        %{ start_phone: "+19154710551", end_phone: "+19154710555" }
+      ] 
+    })
+    refute changeset.valid?
+    cs_child1 = Enum.at(get_change(changeset, :childs), 1)
+    assert List.keymember?(cs_child1.errors, :start_phone, 0) 
+    assert List.keymember?(cs_child1.errors, :end_phone, 0) 
+  end
 
 end
