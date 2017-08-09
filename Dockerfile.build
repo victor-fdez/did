@@ -1,22 +1,21 @@
-#FROM alpine:3.5
-#RUN apk --no-cache add ca-certificates
-#ADD kube-traefik /kube-traefik
-#ENTRYPOINT ["/kube-traefik"]
-FROM instrumentisto/glide:0.12.3-go1.8
+FROM elixir:1.4.5 
 
-WORKDIR /go/src/github.com/victor-fdez/kube-route53-traefik/
+RUN mix local.hex --force && \ 
+    mix local.rebar --force && \ 
+    mix hex.info
 
-COPY ./glide.lock \
-     ./glide.yaml \
-     /go/src/github.com/victor-fdez/kube-route53-traefik/ 
+COPY ./mix.exs ./mix.lock ./ 
+RUN mix deps.get
 
-RUN glide --no-color install
+COPY ./web/ ./web/
+COPY ./lib/ ./lib/
+COPY ./config/ ./config/
+COPY ./test/ ./test/
+COPY ./priv/ ./priv/
+COPY ./rel/config.exs ./rel/config.exs
 
-COPY ./main.go /go/src/github.com/victor-fdez/kube-route53-traefik/
-COPY ./watch/ /go/src/github.com/victor-fdez/kube-route53-traefik/watch/
-COPY ./view/ /go/src/github.com/victor-fdez/kube-route53-traefik/view/ 
-COPY ./dns_providers/ /go/src/github.com/victor-fdez/kube-route53-traefik/dns_providers/
+ENV MIX_ENV=prod
+RUN mix release
 
-RUN go build -o kube-traefik .
-
+RUN pwd 
 

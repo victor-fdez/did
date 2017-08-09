@@ -38,7 +38,8 @@ defmodule Did.Mixfile do
       {:gettext, "~> 0.11"},
       {:cowboy, "~> 1.0"},
       {:phone, "0.3.3"},
-      {:scrivener, "~> 2.3"}
+      {:scrivener, "~> 2.3"},
+      {:distillery, "~> 1.4"}
     ]
   end
 
